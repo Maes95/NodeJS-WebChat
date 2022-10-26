@@ -1,6 +1,6 @@
 # NodeJS-WebChat
 
-This is a WebChat with Node.js.
+This is a WebChat with Node.js and SocketIO.
 
 # Prerequisites
 
@@ -16,5 +16,5 @@ npm install
 ## Start application
 
 ```sh
-$ node app.js
+$ npm start
 ```

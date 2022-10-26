@@ -1,46 +1,42 @@
 const express = require('express');
 const app = express();
-const SocketServer = require('ws').Server;
 const http = require('http');
 const server = http.createServer(app).listen(9000);
+
+const { Server } = require("socket.io");
+const io = new Server(server);
 
 // To use serve files in "frontend"
 app.use(express.static('frontend'));
 
-// Set up SocketServer with Express
-const wss = new SocketServer({ server });
-
 // Set with the user names
 var users = new Set();
 
-function broadcast(room, message) {
-    wss.clients.forEach((client) => { if (client.room == room) client.send(JSON.stringify(message)) });
-}
+io.on('connection', (socket) => {
 
-wss.on('connection', (ws) => {
+    // Recive messages from Client
+    socket.on('message', (data) => {
+        io.to(data['room']).emit("message", data);
+    });
 
-    ws.on('message', (data) => {
-        var message = JSON.parse(data);
-        if (message['message']) {
-            // Normal message (broadcast it)
-            broadcast(ws.room, message)
+    // Recive event "new-user"
+    socket.on('new-user', (message) => {
+        if (users.has(message['name'])) {
+            socket.emit('system-message', { message: "User already exist. Disconnected" });
+            socket.disconnect();
         } else {
-            // First message (first connection)
-            if (users.has(message['name'])) {
-                ws.send(JSON.stringify({ type: "system", message: "User already exist" }));
-                ws.close();
-            } else {
-                users.add(message['name']);
-                ws['room'] = message['room'];
-                ws['name'] = message['name'];
-                broadcast(ws.room, { type: "system", message: "User " + ws['name'] + " has joined the room" })
-            }
+            users.add(message['name']);
+            socket.join(message['room']);
+            socket['room'] = message['room'];
+            socket['name'] = message['name'];
+            io.to(socket['room']).emit("system-message", { message: "User " + socket['name'] + " has joined the room" });
         }
     });
 
-    ws.on('close', () => {
-        users.delete(ws['name']);
-        broadcast(ws.room, { type: "system", message: "User " + ws['name'] + " has disconnected" })
+    // When client disconnects
+    socket.on('disconnect', () => {
+        users.delete(socket['name']);
+        io.to(socket['room']).emit("system-message", { message: "User " + socket['name'] + " has left the room" });
     });
 
 });
